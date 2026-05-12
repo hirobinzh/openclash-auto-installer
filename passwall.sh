@@ -154,6 +154,12 @@ OLD_VER="$(opkg status luci-app-passwall 2>/dev/null | sed -n 's/^Version: //p' 
 log "当前已安装版本: ${OLD_VER:-not installed}"
 log "按接近手动 IPK 的方式安装 / 更新 PassWall"
 
+if ! opkg status lyaml >/dev/null 2>&1; then
+    log "安装依赖: lyaml"
+    opkg update || warn "opkg update 失败，将继续尝试安装已缓存的软件源依赖"
+    opkg install lyaml || die "安装依赖 lyaml 失败。请检查系统软件源是否启用 packages 源，或手动执行: opkg update && opkg install lyaml"
+fi
+
 MAIN_IPK="$(download_pkg_from_dir luci-app-passwall passwall_luci)" || die "下载 luci-app-passwall 失败，请检查当前系统版本/架构是否存在对应构建，或稍后重试。"
 LANG_IPK="$(download_pkg_from_dir luci-i18n-passwall-zh-cn passwall_luci)" || die "下载 luci-i18n-passwall-zh-cn 失败，请稍后重试。"
 
