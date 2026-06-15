@@ -281,10 +281,35 @@ install_luci_daed() {
         apk)
             apk add luci-compat zoneinfo-asia ||
                 warn "部分 LuCI DAED 依赖安装失败，将继续尝试安装 Release 包"
+            if apk info -e daed >/dev/null 2>&1; then
+                [ ! -x "$DAED_INIT" ] || "$DAED_INIT" stop >/dev/null 2>&1 || true
+                log "重新安装 OpenWrt daed APK 核心"
+                apk del --force-broken-world daed ||
+                    die "移除现有 daed APK 失败，无法恢复 OpenWrt 专用核心"
+            fi
             apk add --allow-untrusted "$CORE_PKG" "$LUCI_PKG" "$I18N_PKG" ||
-                warn "LuCI DAED 界面安装失败；启用并启动 daed 后仍可通过 2023 端口使用"
+                die "安装 OpenWrt daed 与 LuCI Release 包失败"
             ;;
     esac
+}
+
+daed_is_running() {
+    pidof daed >/dev/null 2>&1
+}
+
+verify_daed_started() {
+    sleep 3
+    if daed_is_running; then
+        return 0
+    fi
+
+    warn "daed 启动后立即退出"
+    if [ -s /var/log/daed/daed.log ]; then
+        warn "最近的 daed 日志:"
+        tail -n 20 /var/log/daed/daed.log >&2 || true
+    fi
+    warn "可在 LuCI '服务 -> DAED -> 日志' 查看完整日志，或执行: logread -e daed"
+    return 1
 }
 
 detect_asset_arch() {
@@ -686,7 +711,11 @@ main() {
         *) DAED_ENABLED_BEFORE="0" ;;
     esac
     install_luci_daed "$PKG_MGR"
-    install_daed "$ASSET_ARCH" "$LATEST_TAG"
+    if [ "$PKG_MGR" = "apk" ] && apk info -e daed >/dev/null 2>&1; then
+        log "OpenWrt 25.12 使用上游 daed APK 核心与服务脚本"
+    else
+        install_daed "$ASSET_ARCH" "$LATEST_TAG"
+    fi
     uci set daed.config.enabled="$DAED_ENABLED_BEFORE"
     uci commit daed
     refresh_luci
@@ -698,6 +727,7 @@ main() {
         uci commit daed
         "$DAED_INIT" enable
         "$DAED_INIT" restart || die "daed 服务启动失败，可执行 logread -e daed 查看日志"
+        verify_daed_started || die "daed 无法保持运行，请根据上方日志检查 BTF/eBPF 兼容性"
         log "daed 服务已启用并启动"
     else
         log "daed 安装完成，LuCI '启用' 选项默认未勾选；请在 '服务 -> DAED' 中手动启用"
