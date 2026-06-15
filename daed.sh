@@ -13,7 +13,7 @@ DAED_BIN="/usr/bin/daed"
 DAED_SHARE="/usr/share/daed"
 DAED_CONFIG="/etc/daed"
 DAED_INIT="/etc/init.d/daed"
-SKIP_START="0"
+START_AFTER_INSTALL="0"
 SKIP_LUCI="0"
 FORCE_PKG_UPDATE="1"
 LOCK_ACQUIRED="0"
@@ -66,7 +66,8 @@ usage() {
   sh daed.sh [选项]
 
 选项:
-  --skip-start        安装后不启用和启动 daed 服务
+  --start             安装后启用并启动 daed 服务（默认保持停用）
+  --skip-start        兼容旧参数；安装后保持停用
   --skip-luci         跳过安装 LuCI DAED 界面
   --skip-pkg-update   跳过 opkg update / apk update
   -h, --help          显示帮助
@@ -76,8 +77,11 @@ EOF_USAGE
 parse_args() {
     while [ "$#" -gt 0 ]; do
         case "$1" in
+            --start)
+                START_AFTER_INSTALL="1"
+                ;;
             --skip-start)
-                SKIP_START="1"
+                START_AFTER_INSTALL="0"
                 ;;
             --skip-luci)
                 SKIP_LUCI="1"
@@ -551,12 +555,14 @@ main() {
     NEW_VER="$("$DAED_BIN" --version 2>/dev/null | awk '{print $NF}' | head -n1 || true)"
     log "安装后版本: ${NEW_VER:-unknown}"
 
-    if [ "$SKIP_START" = "1" ]; then
-        warn "已按参数跳过启动；可执行 /etc/init.d/daed enable && /etc/init.d/daed start"
-    else
+    if [ "$START_AFTER_INSTALL" = "1" ]; then
         "$DAED_INIT" enable
         "$DAED_INIT" restart || die "daed 服务启动失败，可执行 logread -e daed 查看日志"
         log "daed 服务已启用并启动"
+    else
+        "$DAED_INIT" stop >/dev/null 2>&1 || true
+        "$DAED_INIT" disable >/dev/null 2>&1 || true
+        log "daed 安装完成，服务保持停用；请在 LuCI“服务 -> DAED”中手动启动"
     fi
 
     warn "daed 依赖 eBPF/BTF；部分 OpenWrt 固件即使内核版本满足，也可能因内核裁剪而无法运行"
