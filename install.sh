@@ -38,6 +38,12 @@ need_cmd() {
     command -v "$1" >/dev/null 2>&1 || die "缺少命令: $1"
 }
 
+need_downloader() {
+    command -v curl >/dev/null 2>&1 && return 0
+    command -v wget >/dev/null 2>&1 && return 0
+    die "缺少 curl 或 wget，无法下载文件"
+}
+
 usage() {
     cat <<'EOF_USAGE'
 用法:
@@ -201,10 +207,18 @@ detect_core_candidates() {
 download_file() {
     URL="$1"
     OUT="$2"
-    if ! curl -fsSL --retry 3 --connect-timeout 15 "$URL" -o "$OUT"; then
-        return 1
+
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --retry 3 --connect-timeout 15 "$URL" -o "$OUT" && return 0
+        curl -kfsSL --retry 2 --connect-timeout 15 "$URL" -o "$OUT" && return 0
     fi
-    return 0
+
+    if command -v wget >/dev/null 2>&1; then
+        wget -qO "$OUT" "$URL" && return 0
+        wget --no-check-certificate -qO "$OUT" "$URL" && return 0
+    fi
+
+    return 1
 }
 
 is_openclash_installed() {
@@ -312,13 +326,16 @@ fetch_openclash_release_meta() {
 
 get_latest_tag() {
     VERSION_JSON="$TMP_ROOT/openclash_version.json"
+    LATEST_HTML="$TMP_ROOT/openclash_latest.html"
 
     if [ -f "$VERSION_JSON" ]; then
         jsonfilter -i "$VERSION_JSON" -e '@.tag_name' 2>/dev/null || true
         return 0
     fi
 
-    curl -fsSI --retry 3 https://github.com/vernesong/OpenClash/releases/latest 2>/dev/null | sed -n 's#^location: .*releases/tag/\([^\r]*\)\r$#\1#Ip' | head -n1
+    if download_file "https://github.com/vernesong/OpenClash/releases/latest" "$LATEST_HTML"; then
+        sed -n 's#.*releases/tag/\([^"'"'"'<]*\).*#\1#p' "$LATEST_HTML" | head -n1
+    fi
 }
 
 normalize_version() {
@@ -574,7 +591,7 @@ EOF_SUMMARY
 }
 
 main() {
-    need_cmd curl
+    need_downloader
     need_cmd tar
     need_cmd grep
     need_cmd head

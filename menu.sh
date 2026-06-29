@@ -3,7 +3,8 @@ set -eu
 
 REPO="slobys/openclash-auto-installer"
 BRANCH="main"
-BASE_URL="https://raw.githubusercontent.com/$REPO/$BRANCH"
+DEFAULT_BASE_URL="https://raw.githubusercontent.com/$REPO/$BRANCH"
+BASE_URL="${OPENCLASH_AUTO_BASE_URL:-$DEFAULT_BASE_URL}"
 RESOLVED_BASE_URL=""
 TMP_SCRIPT="/tmp/openclash-menu-action.sh"
 NONINTERACTIVE_ACTION=""
@@ -19,6 +20,29 @@ die() {
 
 need_cmd() {
     command -v "$1" >/dev/null 2>&1 || die "缺少命令: $1"
+}
+
+need_downloader() {
+    command -v curl >/dev/null 2>&1 && return 0
+    command -v wget >/dev/null 2>&1 && return 0
+    die "缺少 curl 或 wget，无法下载脚本"
+}
+
+download_file() {
+    URL="$1"
+    OUT="$2"
+
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --retry 3 --connect-timeout 15 "$URL" -o "$OUT" && return 0
+        curl -kfsSL --retry 2 --connect-timeout 15 "$URL" -o "$OUT" && return 0
+    fi
+
+    if command -v wget >/dev/null 2>&1; then
+        wget -qO "$OUT" "$URL" && return 0
+        wget --no-check-certificate -qO "$OUT" "$URL" && return 0
+    fi
+
+    return 1
 }
 
 usage() {
@@ -165,7 +189,19 @@ resolve_base_url() {
         return 0
     fi
 
-    LATEST_SHA="$(curl -fsSL --retry 3 "https://api.github.com/repos/$REPO/commits/$BRANCH" 2>/dev/null | sed -n 's/.*"sha":[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' | head -n1 || true)"
+    if [ "${OPENCLASH_AUTO_BASE_URL:-}" != "" ]; then
+        RESOLVED_BASE_URL="$BASE_URL"
+        printf '%s' "$RESOLVED_BASE_URL"
+        return 0
+    fi
+
+    COMMIT_JSON="/tmp/openclash-menu-commit.json"
+    rm -f "$COMMIT_JSON"
+    LATEST_SHA=""
+    if download_file "https://api.github.com/repos/$REPO/commits/$BRANCH" "$COMMIT_JSON"; then
+        LATEST_SHA="$(sed -n 's/.*"sha":[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' "$COMMIT_JSON" | head -n1 || true)"
+        rm -f "$COMMIT_JSON"
+    fi
     if [ -n "$LATEST_SHA" ]; then
         RESOLVED_BASE_URL="https://raw.githubusercontent.com/$REPO/$LATEST_SHA"
     else
@@ -193,7 +229,7 @@ download_and_run() {
     URL="$(resolve_base_url)/$SCRIPT_NAME"
 
     log "下载脚本: $URL"
-    curl -fsSL --retry 3 "$URL" -o "$TMP_SCRIPT" || die "下载脚本失败: $SCRIPT_NAME"
+    download_file "$URL" "$TMP_SCRIPT" || die "下载脚本失败: $SCRIPT_NAME"
     chmod +x "$TMP_SCRIPT"
     sh "$TMP_SCRIPT" "$@"
 }
@@ -511,7 +547,7 @@ run_uninstall_menu() {
 
 main() {
     parse_args "$@"
-    need_cmd curl
+    need_downloader
     choice=""
 
     if [ -n "$NONINTERACTIVE_ACTION" ]; then

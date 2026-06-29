@@ -23,19 +23,19 @@
 推荐直接使用菜单模式，安装、更新、检查版本和卸载都在菜单里：
 
 ```sh
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/slobys/openclash-auto-installer/main/menu.sh)"
+wget -qO /usr/bin/openclash-menu https://raw.githubusercontent.com/slobys/openclash-auto-installer/main/menu.sh && chmod +x /usr/bin/openclash-menu && openclash-menu
 ```
 
-固定稳定版可使用 Release 标签，例如：
+国内访问 GitHub 较慢时，可使用 Gitee 入口：
 
 ```sh
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/slobys/openclash-auto-installer/v1.2.4/menu.sh)"
+wget -qO /usr/bin/openclash-menu https://gitee.com/naiyou88/openclash-auto-installer/raw/main/menu.sh && chmod +x /usr/bin/openclash-menu && OPENCLASH_AUTO_BASE_URL=https://gitee.com/naiyou88/openclash-auto-installer/raw/main openclash-menu
 ```
 
-如果 GitHub raw 访问慢，可用 jsDelivr：
+如果系统已安装 `curl`，也可以使用：
 
 ```sh
-sh -c "$(curl -fsSL https://cdn.jsdelivr.net/gh/slobys/openclash-auto-installer@main/menu.sh)"
+curl -fsSL https://raw.githubusercontent.com/slobys/openclash-auto-installer/main/menu.sh -o /usr/bin/openclash-menu && chmod +x /usr/bin/openclash-menu && openclash-menu
 ```
 
 菜单结构：

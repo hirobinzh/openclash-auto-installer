@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 修复 ImmortalWrt / 精简 OpenWrt 首装环境缺少 `curl` 时无法打开菜单的问题；README 主入口改为 `wget` 下载菜单到 `/usr/bin/openclash-menu` 后执行，`menu.sh` 和 OpenClash 安装流程支持 `curl/wget` 双下载器，并新增 Gitee 原始文件入口。
 - 新增 `daed.sh`，从 `daeuniverse/daed` 官方 Release 安装 / 更新 daed 静态二进制、GeoIP/GeoSite 数据与 OpenWrt procd 服务。
 - 菜单、更新检测和安全卸载新增 daed 入口；安装前检查架构、Linux 5.17+、eBPF/BTF 内核能力及磁盘空间。
 - daed 最新版本检测仅匹配正式 `v*` Release，避免被同仓库的 `dae-lang-core` 等组件 Release 干扰。
